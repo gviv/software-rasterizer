@@ -1,5 +1,7 @@
 #include <voxium.h>
 
+#include "obj_loader.cpp"
+
 class App : public vx::BaseApp
 {
 public:
