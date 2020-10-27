@@ -52,4 +52,12 @@ struct Shader
     int nbVaryings;
 };
 
+void render(
+    Mesh& mesh,
+    Shader shader,
+    u32* pixels,
+    i32 bufferWidth,
+    i32 bufferHeight,
+    f32* depthBuffer);
+
 #endif
