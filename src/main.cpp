@@ -89,6 +89,10 @@ public:
 
         std::snprintf(str, 256, "FPS: %.2f", vx::framerate());
         vx::text(str, 0, 30);
+
+        g_nbTrianglesOutside = 0;
+        g_nbTrianglesBackfacing = 0;
+        g_nbTrianglesClipped = 0;
     }
 };
 
