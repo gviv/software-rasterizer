@@ -184,10 +184,10 @@ void rasterize(
 
                     // TODO(gviv): Gamma correction.
 
-                    finalColor.r = max(0.f, min(1.f, finalColor.r));
-                    finalColor.g = max(0.f, min(1.f, finalColor.g));
-                    finalColor.b = max(0.f, min(1.f, finalColor.b));
-                    finalColor.a = max(0.f, min(1.f, finalColor.a));
+                    finalColor.r = clamp01(finalColor.r);
+                    finalColor.g = clamp01(finalColor.g);
+                    finalColor.b = clamp01(finalColor.b);
+                    finalColor.a = clamp01(finalColor.a);
 
                     v4 pixelColor = finalColor * 255.f;
                     *pixel =
