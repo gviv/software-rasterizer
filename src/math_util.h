@@ -947,19 +947,19 @@ struct m4_
 using m4 = m4_<f32>;
 using m4_x8 = m4_<f32_x8>;
 
-m4 m4::id{{
-    {1.f, 0.f, 0.f, 0.f},
-    {0.f, 1.f, 0.f, 0.f},
-    {0.f, 0.f, 1.f, 0.f},
-    {0.f, 0.f, 0.f, 1.f},
-}};
+m4 m4::id{
+    1.f, 0.f, 0.f, 0.f,
+    0.f, 1.f, 0.f, 0.f,
+    0.f, 0.f, 1.f, 0.f,
+    0.f, 0.f, 0.f, 1.f,
+};
 
-m4_x8 m4_x8::id{{
-    {makeF32_x8(1.f), makeF32_x8(0.f), makeF32_x8(0.f), makeF32_x8(0.f)},
-    {makeF32_x8(0.f), makeF32_x8(1.f), makeF32_x8(0.f), makeF32_x8(0.f)},
-    {makeF32_x8(0.f), makeF32_x8(0.f), makeF32_x8(1.f), makeF32_x8(0.f)},
-    {makeF32_x8(0.f), makeF32_x8(0.f), makeF32_x8(0.f), makeF32_x8(1.f)},
-}};
+m4_x8 m4_x8::id{
+    makeF32_x8(1.f), makeF32_x8(0.f), makeF32_x8(0.f), makeF32_x8(0.f),
+    makeF32_x8(0.f), makeF32_x8(1.f), makeF32_x8(0.f), makeF32_x8(0.f),
+    makeF32_x8(0.f), makeF32_x8(0.f), makeF32_x8(1.f), makeF32_x8(0.f),
+    makeF32_x8(0.f), makeF32_x8(0.f), makeF32_x8(0.f), makeF32_x8(1.f),
+};
 
 inline
 v4_x8 operator*(const m4_x8& mat, const v4_x8& vec)
@@ -1099,12 +1099,12 @@ m4_x8 makeM4_x8(
     f32 e20, f32 e21, f32 e22, f32 e23,
     f32 e30, f32 e31, f32 e32, f32 e33)
 {
-    return {{
-        {makeF32_x8(e00), makeF32_x8(e01), makeF32_x8(e02), makeF32_x8(e03)},
-        {makeF32_x8(e10), makeF32_x8(e11), makeF32_x8(e12), makeF32_x8(e13)},
-        {makeF32_x8(e20), makeF32_x8(e21), makeF32_x8(e22), makeF32_x8(e23)},
-        {makeF32_x8(e30), makeF32_x8(e31), makeF32_x8(e32), makeF32_x8(e33)},
-    }};
+    return {
+        makeF32_x8(e00), makeF32_x8(e01), makeF32_x8(e02), makeF32_x8(e03),
+        makeF32_x8(e10), makeF32_x8(e11), makeF32_x8(e12), makeF32_x8(e13),
+        makeF32_x8(e20), makeF32_x8(e21), makeF32_x8(e22), makeF32_x8(e23),
+        makeF32_x8(e30), makeF32_x8(e31), makeF32_x8(e32), makeF32_x8(e33),
+    };
 }
 
 // Assumes that `p` is a point, so it's affected by the translation part of the
