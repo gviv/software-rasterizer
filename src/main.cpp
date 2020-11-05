@@ -5,6 +5,11 @@
 #include "obj_loader.cpp"
 #include "rasterizer.cpp"
 
+// 0: Triangle
+// 1: Icosphere with basic shading
+#define SCENE 1
+
+#if SCENE == 0
 VERTEX_SHADER(simpleVertexShader)
 {
     out[0] = vertex.position.x;
@@ -18,11 +23,74 @@ FRAGMENT_SHADER(simpleFragmentShader)
 {
     return {in[0], in[1], in[2], 1.f};
 }
+#elif SCENE == 1
+VERTEX_SHADER(basicMaterialVertexShader)
+{
+    const m4& modelToWorld = *static_cast<const m4*>(uniforms[0]);
+    const m4& worldToView  = *static_cast<const m4*>(uniforms[1]);
+    const m4& projection   = *static_cast<const m4*>(uniforms[2]);
+    const m4& modelToWorldNormal = *static_cast<const m4*>(uniforms[3]);
+
+    v3 normalWorldSpace = multMat44Vec3(modelToWorldNormal, vertex.normal);
+    out[0] = normalWorldSpace.x;
+    out[1] = normalWorldSpace.y;
+    out[2] = normalWorldSpace.z;
+
+    v3 vertexWorldSpace = multMat44Point3(modelToWorld, vertex.position);
+    out[3] = vertexWorldSpace.x;
+    out[4] = vertexWorldSpace.y;
+    out[5] = vertexWorldSpace.z;
+
+    v3 vertexViewSpace = multMat44Point3(worldToView, vertexWorldSpace);
+
+    return projection * v4{vertexViewSpace, 1.f};
+}
+
+FRAGMENT_SHADER(basicMaterialFragmentShader)
+{
+    const v3& lightPosWorld = *static_cast<const v3*>(uniforms[0]);
+    v3 normalWorldSpace{in[0], in[1], in[2]};
+    v3 vertexWorldSpace{in[3], in[4], in[5]};
+    v3 objColor{1.f, 1.f, 0.f};
+    v3 lightColor{1.f};
+    // TODO(gviv): I want a regular `normalize` function.
+    v3 lightDir = (lightPosWorld - vertexWorldSpace).normalize();
+    normalWorldSpace.normalize();
+
+    v3 ambient{.2f};
+    v3 diffuse =
+        objColor *
+        (ambient + lightColor * max(0.f, lightDir.dot(normalWorldSpace)));
+
+    return {diffuse, 1.f};
+}
+#endif
+
+struct Camera
+{
+    v3 position;
+    v3 right;
+    v3 up;
+    v3 forward;
+};
 
 class App : public vx::BaseApp
 {
+#if SCENE == 0
     Mesh triangle;
     Shader simpleShader;
+#elif SCENE == 1
+    Mesh icosphere;
+    Shader basicMaterialShader;
+    v3 modelPosition{0.f, 0.f, 0.f};
+    v3 modelRotation;
+    v3 modelScale{1.f, 1.f, 1.f};
+    Camera camera;
+    v3 lightPos{0.f, 10.f, 5.f};
+    float fovDegrees = 60.f;
+    float n = .5f;
+    float f = 600.f;
+#endif
     std::unique_ptr<f32[]> depthBuffer;
 
 public:
@@ -30,6 +98,7 @@ public:
     {
         depthBuffer = std::make_unique<f32[]>(vx::width() * vx::height());
 
+#if SCENE == 0
         // Init triangle
         Vertex vertex0 = {
             {.25f, .25f, 0.f},
@@ -57,22 +126,137 @@ public:
         simpleShader.vertexShader = &simpleVertexShader;
         simpleShader.fragmentShader = &simpleFragmentShader;
         simpleShader.nbVaryings = 3;
+#elif SCENE == 1
+        icosphere = loadObj("icosphere.obj").meshes[0];
+
+        // Place the camera so we can see "something" and not some dark void
+        v3 minVertex{FLT_MAX, FLT_MAX, FLT_MAX};
+        v3 maxVertex{FLT_MIN, FLT_MIN, FLT_MIN};
+        for (const auto& v : icosphere.vertices)
+        {
+            minVertex.x = min(v.position.x, minVertex.x);
+            minVertex.y = min(v.position.y, minVertex.y);
+            minVertex.z = min(v.position.z, minVertex.z);
+            maxVertex.x = max(v.position.x, maxVertex.x);
+            maxVertex.y = max(v.position.y, maxVertex.y);
+            maxVertex.z = max(v.position.z, maxVertex.z);
+        }
+
+        camera.position = (minVertex + maxVertex) * .5f;
+        camera.position.z = 3.f;
+
+        camera.right = {1.f, 0.f, 0.f};
+        camera.up = {0.f, 1.f, 0.f};
+        camera.forward = {0.f, 0.f, 1.f};
+
+        // Init shader
+        basicMaterialShader.vertexShader = &basicMaterialVertexShader;
+        basicMaterialShader.fragmentShader = &basicMaterialFragmentShader;
+        basicMaterialShader.nbVaryings = 6;
+#endif
+    }
+
+    void update(float dt)
+    {
+#if SCENE == 1
+        float camSpeed = 10.f;
+        modelRotation.x += dt * .5f;
+        modelRotation.z += dt;
+
+        if (vx::isDown(vx::Key::SHIFT))
+        {
+            camSpeed = 100.f;
+        }
+
+        if (vx::isDown(vx::Key::W))
+        {
+            camera.position.z -= camSpeed * dt;
+        }
+        else if (vx::isDown(vx::Key::S))
+        {
+            camera.position.z += camSpeed * dt;
+        }
+#endif
     }
 
     void draw()
     {
+        // We want to directly operate on the screen's pixels, so we don't have
+        // to render in some offscreen buffer first and blit it afterwards.
+        u32* pixels = vx::getPixels();
+        int bufferWidth = vx::width();
+        int bufferHeight = vx::height();
+
         // Clear depth buffer
-        for (int i = 0; i < vx::width() * vx::height(); ++i)
+        for (int i = 0; i < bufferWidth * bufferHeight; ++i)
         {
             depthBuffer[i] = 10000.f;
         }
 
-        // We want to directly operate on the screen's pixels, so we don't have
-        // to render in some offscreen buffer first and blit it afterwards.
-        u32* pixels = vx::getPixels();
-
+#if SCENE == 0
         // Render the triangle!
-        render(triangle, simpleShader, pixels, vx::width(), vx::height(), depthBuffer.get());
+        render(triangle, simpleShader, pixels, bufferWidth, bufferHeight, depthBuffer.get());
+#elif SCENE == 1
+        // TODO(gviv): Maybe we want some helper functions that return
+        // transformation matrices.
+        m4 modelToWorld =
+            // Translate
+            m4{1.f, 0.f, 0.f, modelPosition.x,
+               0.f, 1.f, 0.f, modelPosition.y,
+               0.f, 0.f, 1.f, modelPosition.z,
+               0.f, 0.f, 0.f, 1.f}
+            *
+            // Rotate around z
+            m4{cos(modelRotation.z), -sin(modelRotation.z), 0.f, 0.f,
+               sin(modelRotation.z), cos(modelRotation.z), 0.f, 0.f,
+               0.f, 0.f, 1.f, 0.f,
+               0.f, 0.f, 0.f, 1.f}
+            *
+            // Rotate around x
+            m4{1.f, 0.f, 0.f, 0.f,
+               0.f, cos(modelRotation.x), -sin(modelRotation.x), 0.f,
+               0.f, sin(modelRotation.x), cos(modelRotation.x), 0.f,
+               0.f, 0.f, 0.f, 1.f}
+            *
+            // Scale
+            m4{modelScale.x, 0.f, 0.f, 0.f,
+               0.f, modelScale.y, 0.f, 0.f,
+               0.f, 0.f, modelScale.z, 0.f,
+               0.f, 0.f, 0.f, 1.f};
+
+        m4 worldToView = fastInverse(m4{
+            camera.right.x, camera.up.x, camera.forward.x, camera.position.x,
+            camera.right.y, camera.up.y, camera.forward.y, camera.position.y,
+            camera.right.z, camera.up.z, camera.forward.z, camera.position.z,
+            0.f, 0.f, 0.f, 1.f
+        });
+
+        f32 t = tan(fovDegrees * PI / 360.f) * n;
+        f32 r = t * (f32)bufferWidth / bufferHeight;
+        f32 l = -r;
+        f32 b = -t;
+
+        // Remaps points from [l, r][b, t][n, f] to [0, 1]^3
+        m4 projection = {
+            n / (r - l), 0.f, l / (r - l), 0.f,
+            0.f, n / (t - b), b / (t - b), 0.f,
+            0.f, 0.f, f / (n - f), n * f / (n - f),
+            0.f, 0.f, -1.f, 0.f
+        };
+
+        m4 modelToWorldNormal = transpose(fastInverse(modelToWorld));
+
+        // TODO(gviv): If we only pass uniforms by pointer, we can set them once
+        // at startup.
+        basicMaterialShader.vertexUniforms[0] = &modelToWorld;
+        basicMaterialShader.vertexUniforms[1] = &worldToView;
+        basicMaterialShader.vertexUniforms[2] = &projection;
+        basicMaterialShader.vertexUniforms[3] = &modelToWorldNormal;
+
+        basicMaterialShader.fragmentUniforms[0] = &lightPos;
+
+        render(icosphere, basicMaterialShader, pixels, bufferWidth, bufferHeight, depthBuffer.get());
+#endif
 
         // Print some debug stats
         // TODO(gviv): Add some string formatting function like Python's
@@ -89,6 +273,12 @@ public:
 
         std::snprintf(str, 256, "FPS: %.2f", vx::framerate());
         vx::text(str, 0, 30);
+
+#if SCENE == 1
+        std::snprintf(str, 256, "Cam pos: (%.2f, %.2f, %.2f)",
+                      camera.position.x, camera.position.y, camera.position.z);
+        vx::text(str, 0, 40);
+#endif
 
         g_nbTrianglesOutside = 0;
         g_nbTrianglesBackfacing = 0;

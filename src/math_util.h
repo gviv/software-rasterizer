@@ -961,6 +961,16 @@ m4_x8 m4_x8::id{
     makeF32_x8(0.f), makeF32_x8(0.f), makeF32_x8(0.f), makeF32_x8(1.f),
 };
 
+template<typename T> inline
+m4_<T> transpose(const m4_<T>& a) {
+    return {
+        a[0][0], a[1][0], a[2][0], a[3][0],
+        a[0][1], a[1][1], a[2][1], a[3][1],
+        a[0][2], a[1][2], a[2][2], a[3][2],
+        a[0][3], a[1][3], a[2][3], a[3][3]
+    };
+}
+
 inline
 v4_x8 operator*(const m4_x8& mat, const v4_x8& vec)
 {

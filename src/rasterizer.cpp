@@ -2,15 +2,15 @@
 
 #include "rasterizer.h"
 
+int g_nbTrianglesOutside = 0;
+int g_nbTrianglesBackfacing = 0;
+int g_nbTrianglesClipped = 0;
+
 template<typename T> inline
 T bary(const T& v0, const T& v1MinusV0, const T& v2MinusV0, f32 w1, f32 w2)
 {
     return v0 + w1 * v1MinusV0 + w2 * v2MinusV0;
 }
-
-int g_nbTrianglesOutside = 0;
-int g_nbTrianglesBackfacing = 0;
-int g_nbTrianglesClipped = 0;
 
 void rasterize(
     Shader& shader,
@@ -21,7 +21,7 @@ void rasterize(
     f32* depthBuffer,
     v4 verticesHomogeneousClipSpace[3])
 {
-    v3i verticesScreenSpace[3];
+    v2i verticesScreenSpace[3];
     i32 maxWidth = bufferWidth - 1;
     i32 maxHeight = bufferHeight - 1;
 
@@ -39,8 +39,7 @@ void rasterize(
         // device coordinates) ([0, 1]^3).
         verticesScreenSpace[i] = {
             (i32)((verticesHomogeneousClipSpace[i].x) * (f32)maxWidth + .5f),
-            (i32)((1.f - verticesHomogeneousClipSpace[i].y) * (f32)maxHeight + .5f),
-            0
+            (i32)((1.f - verticesHomogeneousClipSpace[i].y) * (f32)maxHeight + .5f)
         };
     }
 
