@@ -5,6 +5,11 @@
 
 #include "math_util.h"
 
+// Enable or disable SIMD for the vertex/fragment processing.
+// If SIMD_VERTEX is on, SIMD_FRAGMENT must be on too.
+#define SIMD_VERTEX   1
+#define SIMD_FRAGMENT 1
+
 struct Bitmap
 {
     u32* pixels;
@@ -20,6 +25,13 @@ struct Vertex
     v3 normal;
 };
 
+struct Vertex_x8
+{
+    v3_x8 position;
+    v2_x8 texCoords;
+    v3_x8 normal;
+};
+
 struct Mesh
 {
     std::vector<Vertex> vertices;
@@ -31,10 +43,18 @@ struct Model
     std::vector<Mesh> meshes;
 };
 
+#if SIMD_VERTEX
+#define VERTEX_SHADER(name) v4_x8 name(const Vertex_x8& vertex, const void** uniforms, f32_x8* out)
+#else
 #define VERTEX_SHADER(name) v4 name(const Vertex& vertex, const void** uniforms, f32* out)
+#endif
 typedef VERTEX_SHADER(VertexShader);
 
+#if SIMD_FRAGMENT
+#define FRAGMENT_SHADER(name) v4_x8 name(const void** uniforms, f32_x8* in)
+#else
 #define FRAGMENT_SHADER(name) v4 name(const void** uniforms, f32* in)
+#endif
 typedef FRAGMENT_SHADER(FragmentShader);
 
 constexpr int NB_MAX_VARYINGS = 32;

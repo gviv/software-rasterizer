@@ -18,38 +18,80 @@ VERTEX_SHADER(simpleVertexShader)
     out[1] = vertex.position.y;
     out[2] = vertex.position.z;
 
+#if SIMD_VERTEX
+    return {vertex.position, makeF32_x8(1.f)};
+#else
     return {vertex.position, 1.f};
+#endif
 }
 
 FRAGMENT_SHADER(simpleFragmentShader)
 {
+#if SIMD_FRAGMENT
+    return {in[0], in[1], in[2], makeF32_x8(1.f)};
+#else
     return {in[0], in[1], in[2], 1.f};
+#endif
 }
 #elif SCENE == 1
 VERTEX_SHADER(basicMaterialVertexShader)
 {
+#if SIMD_VERTEX
+    const m4_x8& modelToWorld = *static_cast<const m4_x8*>(uniforms[0]);
+    const m4_x8& worldToView  = *static_cast<const m4_x8*>(uniforms[1]);
+    const m4_x8& projection   = *static_cast<const m4_x8*>(uniforms[2]);
+    const m4_x8& modelToWorldNormal = *static_cast<const m4_x8*>(uniforms[3]);
+
+    v3_x8 normalWorldSpace = multMat44Vec3(modelToWorldNormal, vertex.normal);
+    v3_x8 vertexWorldSpace = multMat44Point3(modelToWorld, vertex.position);
+    v3_x8 vertexViewSpace = multMat44Point3(worldToView, vertexWorldSpace);
+#else
     const m4& modelToWorld = *static_cast<const m4*>(uniforms[0]);
     const m4& worldToView  = *static_cast<const m4*>(uniforms[1]);
     const m4& projection   = *static_cast<const m4*>(uniforms[2]);
     const m4& modelToWorldNormal = *static_cast<const m4*>(uniforms[3]);
 
     v3 normalWorldSpace = multMat44Vec3(modelToWorldNormal, vertex.normal);
+    v3 vertexWorldSpace = multMat44Point3(modelToWorld, vertex.position);
+    v3 vertexViewSpace = multMat44Point3(worldToView, vertexWorldSpace);
+#endif
+
+
     out[0] = normalWorldSpace.x;
     out[1] = normalWorldSpace.y;
     out[2] = normalWorldSpace.z;
 
-    v3 vertexWorldSpace = multMat44Point3(modelToWorld, vertex.position);
     out[3] = vertexWorldSpace.x;
     out[4] = vertexWorldSpace.y;
     out[5] = vertexWorldSpace.z;
 
-    v3 vertexViewSpace = multMat44Point3(worldToView, vertexWorldSpace);
-
+#if SIMD_VERTEX
+    return projection * v4_x8{vertexViewSpace, makeF32_x8(1.f)};
+#else
     return projection * v4{vertexViewSpace, 1.f};
+#endif
 }
 
 FRAGMENT_SHADER(basicMaterialFragmentShader)
 {
+#if SIMD_FRAGMENT
+    const v3_x8& lightPosWorld = *static_cast<const v3_x8*>(uniforms[0]);
+    v3_x8 normalWorldSpace{in[0], in[1], in[2]};
+    v3_x8 vertexWorldSpace{in[3], in[4], in[5]};
+    v3_x8 objColor = makeV3_x8({1.f, 1.f, 0.f});
+    v3_x8 lightColor = makeV3_x8(v3{1.f});
+    // TODO(gviv): I want a regular `normalize` function.
+    v3_x8 lightDir = (lightPosWorld - vertexWorldSpace).normalize();
+    normalWorldSpace.normalize();
+
+    f32_x8 zero = _mm256_setzero_ps();
+    v3_x8 ambient = makeV3_x8(v3{.2f});
+    v3_x8 diffuse =
+        objColor *
+        (ambient + lightColor * _mm256_max_ps(zero, lightDir.dot(normalWorldSpace)));
+
+    return {diffuse, makeF32_x8(1.f)};
+#else
     const v3& lightPosWorld = *static_cast<const v3*>(uniforms[0]);
     v3 normalWorldSpace{in[0], in[1], in[2]};
     v3 vertexWorldSpace{in[3], in[4], in[5]};
@@ -65,6 +107,7 @@ FRAGMENT_SHADER(basicMaterialFragmentShader)
         (ambient + lightColor * max(0.f, lightDir.dot(normalWorldSpace)));
 
     return {diffuse, 1.f};
+#endif
 }
 #endif
 
@@ -88,7 +131,11 @@ class App : public vx::BaseApp
     v3 modelRotation;
     v3 modelScale{1.f, 1.f, 1.f};
     Camera camera;
+#if SIMD_FRAGMENT
+    v3_x8 lightPos = makeV3_x8({0.f, 10.f, 5.f});
+#else
     v3 lightPos{0.f, 10.f, 5.f};
+#endif
     float fovDegrees = 60.f;
     float n = .5f;
     float f = 600.f;
@@ -207,6 +254,39 @@ public:
 #elif SCENE == 1
         // TODO(gviv): Maybe we want some helper functions that return
         // transformation matrices.
+#if SIMD_VERTEX
+        m4_x8 modelToWorld =
+            // Translate
+            makeM4_x8({1.f, 0.f, 0.f, modelPosition.x,
+               0.f, 1.f, 0.f, modelPosition.y,
+               0.f, 0.f, 1.f, modelPosition.z,
+               0.f, 0.f, 0.f, 1.f})
+            *
+            // Rotate around z
+            makeM4_x8({cos(modelRotation.z), -sin(modelRotation.z), 0.f, 0.f,
+               sin(modelRotation.z), cos(modelRotation.z), 0.f, 0.f,
+               0.f, 0.f, 1.f, 0.f,
+               0.f, 0.f, 0.f, 1.f})
+            *
+            // Rotate around x
+            makeM4_x8({1.f, 0.f, 0.f, 0.f,
+               0.f, cos(modelRotation.x), -sin(modelRotation.x), 0.f,
+               0.f, sin(modelRotation.x), cos(modelRotation.x), 0.f,
+               0.f, 0.f, 0.f, 1.f})
+            *
+            // Scale
+            makeM4_x8({modelScale.x, 0.f, 0.f, 0.f,
+               0.f, modelScale.y, 0.f, 0.f,
+               0.f, 0.f, modelScale.z, 0.f,
+               0.f, 0.f, 0.f, 1.f});
+
+        m4_x8 worldToView = fastInverse(makeM4_x8({
+            camera.right.x, camera.up.x, camera.forward.x, camera.position.x,
+            camera.right.y, camera.up.y, camera.forward.y, camera.position.y,
+            camera.right.z, camera.up.z, camera.forward.z, camera.position.z,
+            0.f, 0.f, 0.f, 1.f
+        }));
+#else
         m4 modelToWorld =
             // Translate
             m4{1.f, 0.f, 0.f, modelPosition.x,
@@ -238,6 +318,7 @@ public:
             camera.right.z, camera.up.z, camera.forward.z, camera.position.z,
             0.f, 0.f, 0.f, 1.f
         });
+#endif
 
         f32 t = tan(fovDegrees * PI / 360.f) * n;
         f32 r = t * (f32)bufferWidth / bufferHeight;
@@ -245,14 +326,23 @@ public:
         f32 b = -t;
 
         // Remaps points from [l, r][b, t][n, f] to [0, 1]^3
-        m4 projection = {
+#if SIMD_VERTEX
+        m4_x8 projection = makeM4_x8({
+            n / (r - l), 0.f, l / (r - l), 0.f,
+            0.f, n / (t - b), b / (t - b), 0.f,
+            0.f, 0.f, f / (n - f), n * f / (n - f),
+            0.f, 0.f, -1.f, 0.f
+        });
+#else
+        m4 projection{
             n / (r - l), 0.f, l / (r - l), 0.f,
             0.f, n / (t - b), b / (t - b), 0.f,
             0.f, 0.f, f / (n - f), n * f / (n - f),
             0.f, 0.f, -1.f, 0.f
         };
+#endif
 
-        m4 modelToWorldNormal = transpose(fastInverse(modelToWorld));
+        auto modelToWorldNormal = transpose(fastInverse(modelToWorld));
 
         // TODO(gviv): If we only pass uniforms by pointer, we can set them once
         // at startup.
