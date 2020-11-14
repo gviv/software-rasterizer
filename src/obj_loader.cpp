@@ -254,10 +254,14 @@ void addVertices(
 
 }  // namespace
 
-Model loadObj(const char* filename)
+bool loadObj(const char* filename, Model& model)
 {
-    Lexer lexer;
     std::ifstream is{filename};
+    if (!is) {
+        return false;
+    }
+
+    Lexer lexer;
     std::string line;
     std::vector<v3> positions;
     std::vector<v2> texCoords;
@@ -267,7 +271,6 @@ Model loadObj(const char* filename)
     // its own index.
     u32 curVertexIndex = 0;
 
-    Model model;
     model.meshes.resize(1);
 
     // TODO(gviv): Support line continuation.
@@ -435,5 +438,5 @@ Model loadObj(const char* filename)
         }
     }
 
-    return model;
+    return true;
 }

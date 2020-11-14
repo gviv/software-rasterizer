@@ -1,6 +1,8 @@
 #include <memory>
 #include <voxium.h>
 #include <cstdio>
+#include <iostream>
+#include <cstdlib>
 
 #include "obj_loader.cpp"
 #include "rasterizer.cpp"
@@ -127,7 +129,13 @@ public:
         simpleShader.fragmentShader = &simpleFragmentShader;
         simpleShader.nbVaryings = 3;
 #elif SCENE == 1
-        icosphere = loadObj("icosphere.obj").meshes[0];
+        Model model;
+        if (!loadObj("icosphere.obj", model)) {
+            std::cerr << "Error loading OBJ file" << std::endl;
+            // TODO(gviv): Add a "Voxium way" of exiting the program.
+            std::exit(1);
+        }
+        icosphere = model.meshes[0];
 
         // Place the camera so we can see "something" and not some dark void
         v3 minVertex{FLT_MAX, FLT_MAX, FLT_MAX};
