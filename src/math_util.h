@@ -914,16 +914,26 @@ using v2i = v2_<i32>;
 using v3i = v3_<i32>;
 using v4i = v4_<i32>;
 
+
 inline
-v3_x8 makeV3_8x(const v3& vec)
+v3_x8 makeV3_x8(const v3& vec)
 {
-    return {makeF32_x8(vec.x), makeF32_x8(vec.y), makeF32_x8(vec.z)};
+    return {
+        makeF32_x8(vec.x),
+        makeF32_x8(vec.y),
+        makeF32_x8(vec.z)
+    };
 }
 
 inline
-v4_x8 makeV4_x8(const f32& x, const f32& y, const f32& z, const f32& w)
+v4_x8 makeV4_x8(const v4& vec)
 {
-    return {makeF32_x8(x), makeF32_x8(y), makeF32_x8(z), makeF32_x8(w)};
+    return {
+        makeF32_x8(vec.x),
+        makeF32_x8(vec.y),
+        makeF32_x8(vec.z),
+        makeF32_x8(vec.w)
+    };
 }
 
 template<typename T>
@@ -1075,17 +1085,13 @@ m4_x8 fastInverse(const m4_x8 &a)
 }
 
 inline
-m4_x8 makeM4_x8(
-    f32 e00, f32 e01, f32 e02, f32 e03,
-    f32 e10, f32 e11, f32 e12, f32 e13,
-    f32 e20, f32 e21, f32 e22, f32 e23,
-    f32 e30, f32 e31, f32 e32, f32 e33)
+m4_x8 makeM4_x8(const m4& mat)
 {
     return {
-        makeF32_x8(e00), makeF32_x8(e01), makeF32_x8(e02), makeF32_x8(e03),
-        makeF32_x8(e10), makeF32_x8(e11), makeF32_x8(e12), makeF32_x8(e13),
-        makeF32_x8(e20), makeF32_x8(e21), makeF32_x8(e22), makeF32_x8(e23),
-        makeF32_x8(e30), makeF32_x8(e31), makeF32_x8(e32), makeF32_x8(e33),
+        makeF32_x8(mat[0][0]), makeF32_x8(mat[0][1]), makeF32_x8(mat[0][2]), makeF32_x8(mat[0][3]),
+        makeF32_x8(mat[1][0]), makeF32_x8(mat[1][1]), makeF32_x8(mat[1][2]), makeF32_x8(mat[1][3]),
+        makeF32_x8(mat[2][0]), makeF32_x8(mat[2][1]), makeF32_x8(mat[2][2]), makeF32_x8(mat[2][3]),
+        makeF32_x8(mat[3][0]), makeF32_x8(mat[3][1]), makeF32_x8(mat[3][2]), makeF32_x8(mat[3][3]),
     };
 }
 
